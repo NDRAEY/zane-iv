@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use gi_ui::{
     Drawable,
     canvas::Canvas,
-    components::{self, image, layout::linear::LinearLayout, text8x8},
+    components::{layout::linear::LinearLayout, text8x8},
     helpers::i_am_sure_mut,
 };
 use gi_ui_app::Application;
@@ -110,7 +110,6 @@ impl App {
         let mut binding = self.canvas.borrow_mut();
 
         let canvas = i_am_sure_mut::<Canvas>(binding.as_mut());
-        let buffer = canvas.buffer_mut();
 
         for y in 0..image.height() {
             for x in 0..image.width() {
