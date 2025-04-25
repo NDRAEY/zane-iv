@@ -20,8 +20,11 @@ struct App {
 
 impl App {
     pub fn new() -> Self {
-        let (ui, status_text, canvas) = Self::build_ui();
         let mut app = Application::new(300, 300).unwrap();
+
+        app.set_title("Zane Image Viewer");
+
+        let (ui, status_text, canvas) = Self::build_ui();
 
         let ui_ref = app.attach_main_drawable(ui).clone();
 
@@ -55,6 +58,12 @@ impl App {
         (Box::new(ui), st, canv)
     }
 
+    pub fn resize_to_fit(&mut self) {
+        let (width, height) = self.ui.borrow().size();
+
+        self.app.resize(width as _, height as _);
+    }
+
     pub fn set_status(&mut self, status: &String) {
         let mut binding = self.statusbar_text.borrow_mut();
 
@@ -83,8 +92,22 @@ impl App {
             image.height()
         ));
         
+        // WTF? I'll explain.
+        //
+        // I just need to set canvas size, so I mutually borrowed `self.canvas`.
+        // And when I set size of the canvas I need to resize the window to fit whole UI into it.
+        // But at this time there's an active borrow on `binding` that doesn't allow us to
+        // double-borrow `self`.
+        //
+        // So limiting `binding`, resizing canvas and borrowing it again works.
+        {
+            let mut binding = self.canvas.borrow_mut();
+            binding.set_size(image.width(), image.height());
+        }
+
+        self.resize_to_fit();
+
         let mut binding = self.canvas.borrow_mut();
-        binding.set_size(image.width(), image.height());
 
         let canvas = i_am_sure_mut::<Canvas>(binding.as_mut());
         let buffer = canvas.buffer_mut();

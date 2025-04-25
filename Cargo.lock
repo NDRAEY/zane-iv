@@ -183,7 +183,7 @@ dependencies = [
 [[package]]
 name = "gi-ui-app"
 version = "0.1.0"
-source = "git+https://github.com/NDRAEY/gi-ui-app#08d9ff489e9065c3e49faf85ca91b35a225c4dbc"
+source = "git+https://github.com/NDRAEY/gi-ui-app#c1bf57c08ad194224c261aabecc312702bbd23fb"
 dependencies = [
  "gi-ui",
  "x11rb",
