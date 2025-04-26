@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, ops::DerefMut, rc::Rc};
 
 use gi_ui::{
     Drawable,
@@ -8,13 +8,13 @@ use gi_ui::{
 };
 use gi_ui_app::Application;
 
-type Trusted<T> = Rc<RefCell<Box<T>>>;
+type Trusted<T> = Rc<RefCell<T>>;
 
 struct App {
     app: gi_ui_app::Application,
-    ui: Trusted<dyn gi_ui::Drawable>,
+    ui: Trusted<Box<dyn Drawable>>,
 
-    statusbar_text: Trusted<dyn gi_ui::Drawable>,
+    statusbar_text: Trusted<dyn Drawable>,
     canvas: Trusted<dyn Drawable>,
 }
 
@@ -22,7 +22,7 @@ impl App {
     pub fn new() -> Self {
         let mut app = Application::new(300, 300).unwrap();
 
-        app.set_title("Zane Image Viewer");
+        app.set_title("Zane Image Viewer").expect("Failed to set title!");
 
         let (ui, status_text, canvas) = Self::build_ui();
 
@@ -58,28 +58,30 @@ impl App {
         (Box::new(ui), st, canv)
     }
 
-    pub fn resize_to_fit(&mut self) {
+    pub fn resize_to_fit(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let (width, height) = self.ui.borrow().size();
 
-        self.app.resize(width as _, height as _);
+        self.app.resize(width as _, height as _)?;
+        
+        Ok(())
     }
 
     pub fn set_status(&mut self, status: &String) {
         let mut binding = self.statusbar_text.borrow_mut();
 
-        let statusbar = i_am_sure_mut::<text8x8::Text>(binding.as_mut());
+        let statusbar = i_am_sure_mut::<text8x8::Text>(binding.deref_mut());
 
         statusbar.set_text(status.clone());
     }
 
-    pub fn load_image_from_file<S: ToString>(&mut self, path: S) -> Result<(), ()> {
+    pub fn load_image_from_file<S: ToString>(&mut self, path: S) -> Result<(), Box<dyn std::error::Error>> {
         let path = path.to_string();
         let data = std::fs::read(&path).unwrap();
 
         let image = nimage::import::open(&data);
 
         if image.is_none() {
-            return Err(());
+            return Err(Box::new(std::io::Error::other(String::from("Failed to load file!"))));
         }
 
         let (image_type, image) = image.unwrap();
@@ -105,11 +107,11 @@ impl App {
             binding.set_size(image.width(), image.height());
         }
 
-        self.resize_to_fit();
+        self.resize_to_fit()?;
 
         let mut binding = self.canvas.borrow_mut();
 
-        let canvas = i_am_sure_mut::<Canvas>(binding.as_mut());
+        let canvas = i_am_sure_mut::<Canvas>(binding.deref_mut());
 
         for y in 0..image.height() {
             for x in 0..image.width() {
@@ -138,7 +140,7 @@ fn main() {
 
     let mut app = App::new();
 
-    app.load_image_from_file(filename);
+    app.load_image_from_file(filename).expect("Failed to load file!");
 
     app.run();
 }
