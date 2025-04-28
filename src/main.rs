@@ -1,12 +1,10 @@
 use std::{cell::RefCell, ops::DerefMut, rc::Rc};
 
 use gi_ui::{
-    Drawable,
-    canvas::Canvas,
-    components::{layout::linear::LinearLayout, text8x8},
-    helpers::i_am_sure_mut,
+    canvas::Canvas, components::{layout::linear::LinearLayout, text8x8}, helpers::i_am_sure_mut, size::Size, Drawable
 };
 use gi_ui_app::Application;
+use nimage::Image;
 
 type Trusted<T> = Rc<RefCell<T>>;
 
@@ -16,13 +14,16 @@ struct App {
 
     statusbar_text: Trusted<dyn Drawable>,
     canvas: Trusted<dyn Drawable>,
+
+    image: Option<RefCell<Image>>,
 }
 
 impl App {
     pub fn new() -> Self {
         let mut app = Application::new(300, 300).unwrap();
 
-        app.set_title("Zane Image Viewer").expect("Failed to set title!");
+        app.set_title("Zane Image Viewer")
+            .expect("Failed to set title!");
 
         let (ui, status_text, canvas) = Self::build_ui();
 
@@ -33,6 +34,7 @@ impl App {
             app,
             statusbar_text: status_text,
             canvas,
+            image: None
         }
     }
 
@@ -62,7 +64,7 @@ impl App {
         let (width, height) = self.ui.borrow().size();
 
         self.app.resize(width as _, height as _)?;
-        
+
         Ok(())
     }
 
@@ -74,18 +76,24 @@ impl App {
         statusbar.set_text(status.clone());
     }
 
-    pub fn load_image_from_file<S: ToString>(&mut self, path: S) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn load_image_from_file<S: ToString>(
+        &mut self,
+        path: S,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let path = path.to_string();
         let data = std::fs::read(&path).unwrap();
 
         let image = nimage::import::open(&data);
 
         if image.is_none() {
-            return Err(Box::new(std::io::Error::other(String::from("Failed to load file!"))));
+            return Err(Box::new(std::io::Error::other(String::from(
+                "Failed to load file!",
+            ))));
         }
 
         let (image_type, image) = image.unwrap();
 
+        
         self.set_status(&format!(
             "{} [{}] - {}x{}",
             path,
@@ -93,7 +101,7 @@ impl App {
             image.width(),
             image.height()
         ));
-        
+
         // WTF? I'll explain.
         //
         // I just need to set canvas size, so I mutually borrowed `self.canvas`.
@@ -110,7 +118,6 @@ impl App {
         self.resize_to_fit()?;
 
         let mut binding = self.canvas.borrow_mut();
-
         let canvas = i_am_sure_mut::<Canvas>(binding.deref_mut());
 
         for y in 0..image.height() {
@@ -120,10 +127,34 @@ impl App {
             }
         }
 
+        self.image = Some(RefCell::new(image));
+
         Ok(())
     }
 
-    pub fn run(&mut self) {
+    pub fn resize_canvas(&self, width: usize, height: usize) {
+        let mut binding = self.canvas.borrow_mut();
+        let canvas = i_am_sure_mut::<Canvas>(binding.deref_mut());
+
+        let image = self.image.as_ref().unwrap().borrow().scale_to_new(width, height);
+
+        canvas.set_size(width, height);
+
+        for y in 0..image.height() {
+            for x in 0..image.width() {
+                let _ =
+                    canvas.set_pixel(x as _, y as _, 0xff_000000 | image.get_pixel(x, y).unwrap());
+            }
+        }
+    }
+
+    pub fn on_resize(width: usize, height: usize) {
+        println!("{width} {height}");
+
+        // ...
+    }
+
+    pub fn run(&self) {
         self.app.run().unwrap()
     }
 }
@@ -138,9 +169,19 @@ fn main() {
 
     let filename = filename.unwrap();
 
-    let mut app = App::new();
+    let app = Rc::new(RefCell::new(App::new()));
 
-    app.load_image_from_file(filename).expect("Failed to load file!");
+    let app_cb = app.clone();
+    app.borrow_mut().app.set_resize_callback(move |width, height| {
+        let binding = &app_cb.borrow();
 
-    app.run();
+        // binding.set_title(&format!{"{width} {height}"});
+        binding.resize_canvas(width, height);
+    });
+
+    app.borrow_mut().load_image_from_file(filename)
+        .expect("Failed to load file!");
+
+    let binding = app.borrow();
+    binding.run();
 }
