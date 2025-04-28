@@ -68,12 +68,12 @@ impl App {
         Ok(())
     }
 
-    pub fn set_status(&mut self, status: &String) {
+    pub fn set_status(&mut self, status: &str) {
         let mut binding = self.statusbar_text.borrow_mut();
 
         let statusbar = i_am_sure_mut::<text8x8::Text>(binding.deref_mut());
 
-        statusbar.set_text(status.clone());
+        statusbar.set_text(status.to_owned());
     }
 
     pub fn load_image_from_file<S: ToString>(
@@ -148,19 +148,13 @@ impl App {
         }
     }
 
-    pub fn on_resize(width: usize, height: usize) {
-        println!("{width} {height}");
-
-        // ...
-    }
-
     pub fn run(&self) {
         self.app.run().unwrap()
     }
 }
 
 fn main() {
-    let filename = std::env::args().skip(1).next();
+    let filename = std::env::args().nth(1);
 
     if filename.is_none() {
         eprintln!("No file!");
@@ -175,7 +169,6 @@ fn main() {
     app.borrow_mut().app.set_resize_callback(move |width, height| {
         let binding = &app_cb.borrow();
 
-        // binding.set_title(&format!{"{width} {height}"});
         binding.resize_canvas(width, height);
     });
 
